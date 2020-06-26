@@ -1,23 +1,20 @@
-# nMigen-Yosys simulation
+#### [nmigen-yosim](https://github.com/andresdemski/nmigen-yosim)
 
-It is another nMigen simulation backend based on yosys C++ generation.
-The API is inspired by COCOTB
+Verilog/vhdl simulation based on yosys C++ generation with testbenches 
+written in python. The API is inspired by COCOTB.
 
-**status**: WIP
+###### This fork has the following minor changes:
 
+- using verilog instead nmigen as input format
 
-# How to use it?
+- mingw compatible python configuration
 
-```
-python3 adder.py
-```
+- removal of nmigen dependency
 
-# Requirements
+- parsing of inputs to handler_list added
 
-* yosys with cxxtrl backend
-* clang++
-* nMigen
+- example uart.py added:
 
-# Acknowledgements
+<img title="" src="./hello.jpg" alt="" width="609" data-align="center">
 
-The FPGA opensource community makes this possible. Thanks you for all your effort.
+Cxxrtl does not like processes with multiple edges in the sensitivity list ..

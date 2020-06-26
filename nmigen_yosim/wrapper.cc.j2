@@ -20,7 +20,7 @@ std::vector<struct task_handler_t> forked_tasks;
 
 #define WIDTH_TO_CHUNKS( x ) (( ( x ) + 32 - 1) / 32)
 
-cxxrtl_design::p_top top;
+cxxrtl_design::p_{{name}} {{name}};
 uint32_t sim_time = 0;
 uint32_t sim_time_precision = 1;
 PyObject *vcd_callback = NULL;
@@ -54,6 +54,14 @@ struct signal_handler_t handler_list[] = {
      .chunks = WIDTH_TO_CHUNKS({{ wire.width }}),
      .curr = {{ wire.cpath }}.curr.data,
      .next = {{ wire.cpath }}.next.data
+    },
+{% endfor %}
+{% for input in inputs %}
+    {.name = "{{ input.name }}",
+     .width = {{ input.width }},
+     .chunks = WIDTH_TO_CHUNKS({{ input.width }}),
+     .curr = {{ input.cpath }}.data,
+     .next = {{ input.cpath }}.data
     },
 {% endfor %}
 };
@@ -302,8 +310,8 @@ static PyObject* get_by_id(PyObject *self, PyObject *args) {
 
 static void step() {
 	do {
-		top.eval();
-	} while (top.commit());
+		{{name}}.eval();
+	} while ({{name}}.commit());
     sim_time += sim_time_precision;
 }
 
@@ -423,8 +431,8 @@ static PyObject* scheduller(PyObject *self, PyObject *args) {
                     } else it++;
                 }
             }
-            top.eval();
-        } while(triggered || top.commit());
+            {{name}}.eval();
+        } while(triggered || {{name}}.commit());
 
 #ifdef VCD_DUMP
         if(vcd_callback) {

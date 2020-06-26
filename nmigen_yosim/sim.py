@@ -1,11 +1,9 @@
 from .dut import Dut
 from .gen import generate_wrapper
 from .vcd import VCDWaveformWriter
-import importlib
-from nmigen import *
-from nmigen._toolchain import require_tool
-from nmigen.back import rtlil, verilog
+import importlib.util
 import os
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -16,22 +14,17 @@ class Task:
         self.coro = coro
 
 class Simulator:
-    def __init__(self, design, platform=None, ports=None, vcd_file=False, precision=(1, 'ps'), debug=False):
-        fragment = Fragment.get(design, None)
-        output = rtlil.convert(fragment, name='top', ports=ports)
-
+    def __init__(self, name, platform=None, ports=None, vcd_file=False, precision=(1, 'ps'), debug=False):
         self.tmp_dir = tempfile.TemporaryDirectory()
-        self.il_file = self.tmp_dir.name + '/top.il'
-        self.cpp_file = self.tmp_dir.name + '/top.cc'
-        self.so_file = self.tmp_dir.name + '/simulation.so'
+        self.il_file =  name + '.il'
+        self.cpp_file = self.tmp_dir.name + '/' + name + '.cc'
+        self.so_file = 'simulation.pyd'
         self.vcd_file = vcd_file
-
+        self.name = name
+        
         wrapper_path = os.path.dirname(os.path.realpath(__file__))
         self.wrapper_file = wrapper_path + '/wrapper.cc.j2'
         self.debug = debug
-
-        with open(self.il_file, 'w') as f:
-            f.write(output)
 
         self.cxxrtl()
         self.add_wrapper()
@@ -48,7 +41,7 @@ class Simulator:
         self.set_precision(*precision)
 
     def cxxrtl(self):
-        subprocess.run(f'yosys -q {self.il_file} -o {self.cpp_file}'.split(' ')
+        subprocess.run(f'yosys -o {self.cpp_file} {self.il_file}'.split(' ')
                       ).check_returncode()
 
     def add_wrapper(self):
@@ -56,21 +49,27 @@ class Simulator:
             wrapper = f.read()
         with open(self.cpp_file, 'r+') as f:
             cpp = f.read()
-            wrapper = generate_wrapper(cpp=cpp, template=wrapper)
+            wrapper = generate_wrapper(cpp=cpp, template=wrapper, name=self.name)
             f.write(wrapper)
 
     def build(self):
-        python_cflags = subprocess.check_output(['python3-config', '--includes'], encoding="utf-8")
+        python_incflags = subprocess.check_output(['sh','-c', 'python3-config --includes'], encoding="utf-8")
+        python_ldflags = subprocess.check_output(['sh','-c', 'python3-config --ldflags'], encoding="utf-8")
+        yosys_inc = os.path.join(os.path.split(os.path.split(shutil.which('yosys'))[0])[0], 'share','yosys','include')
+        yosys_incflag = '-I'+yosys_inc
+        print(yosys_incflag)
         debug_cflags = '-DDEBUG' if self.debug else ''
         vcd_cflags = '-DVCD_DUMP' if self.vcd_file else ''
+        print
         subprocess.run(['clang++',
-                        '-I/usr/local/share/yosys/include/backends/cxxrtl/',
-                        '-shared', '-fPIC', '-O3',
-                        *python_cflags.split(' '),
+                        f'{self.cpp_file}',
+                        yosys_incflag,
+                        *python_incflags.split(' '),
+                        '-shared', '-O3',
+                        *python_ldflags.split(' '),
                         debug_cflags,
                         vcd_cflags,
-                        '-o', f'{self.so_file}',
-                        f'{self.cpp_file}']).check_returncode()
+                        '-o', f'{self.so_file}'])
 
     def run(self, coros):
         tasks = []
